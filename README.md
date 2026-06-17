@@ -16,7 +16,7 @@ Autonomous social manager for **Mavrx KSA** that runs entirely in the cloud (Git
 ## How it stays $0 + hands-off
 - **Host**: GitHub Actions on a **private** repo (free minutes; ~1,000/mo used of 2,000).
 - **AI**: Claude API over HTTPS for captions + replies (~$1/mo). No Claude Code session needed.
-- **Assets**: Google Drive REST API (read-only service account) — keeps your curated "Mavrx Media 1" library + existing dedupe.
+- **Assets**: a plain `assets/` folder in the repo — drop files in (GitHub app works), the bot posts one/day and dedupes by filename. No Google Cloud setup. (`src/lib/drive.js` is an optional advanced Drive source, not used by default.)
 - **Publishing**: Meta Graph API with your existing never-expiring Page token.
 - **State**: `state/*.json`, committed back to the repo after each run (also keeps the schedule alive).
 - **Reporting**: a free Telegram bot (digests, escalations, TikTok/Snap hand-off).
@@ -28,8 +28,9 @@ One-time, ~30 min. See **[SETUP.md](SETUP.md)**.
 ```
 src/post.js          daily post orchestrator (FEED↔STORY)
 src/engage.js        smart comment+DM replies
+src/lib/assets.js    the post queue = files in assets/
 src/lib/meta.js      IG+FB publish (Meta Graph API)
-src/lib/drive.js     read-only Drive via service-account JWT
+src/lib/drive.js     OPTIONAL Drive source (read-only SA JWT) — not used by default
 src/lib/caption.js   Claude caption + reply (ported brand-voice prompt)
 src/lib/crossbundle.js  TikTok/Snap Telegram hand-off
 src/lib/notify.js    Telegram
