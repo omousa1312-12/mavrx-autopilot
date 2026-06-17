@@ -19,6 +19,10 @@
     "ig": [],
     "fb": []
   },
+  "last_dm_message_ids": {
+    "ig": {},
+    "fb": {}
+  },
   "stats": {
     "comments_replied": 8,
     "comments_liked": 0,
@@ -26,9 +30,5 @@
     "dms_replied": 0,
     "dms_escalated": 0,
     "errors": 83
-  },
-  "last_dm_message_ids": {
-    "ig": {},
-    "fb": {}
   }
 }
