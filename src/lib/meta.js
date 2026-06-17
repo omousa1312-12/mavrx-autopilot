@@ -57,22 +57,66 @@ async function withRetry(label, fn) {
   throw new Error(`[${label}] failed after 3 attempts → ${lastErr.message}`);
 }
 
-async function uploadToCatbox(localPath) {
-  return withRetry('catbox-upload', async () => {
-    const ext = path.extname(localPath).slice(1).toLowerCase();
-    const mime = MIME_BY_EXT[ext] || 'application/octet-stream';
-    const buf = fs.readFileSync(localPath);
-    const form = new FormData();
-    form.append('reqtype', 'fileupload');
-    form.append('fileToUpload', new Blob([buf], { type: mime }), path.basename(localPath));
-    const res = await fetch('https://catbox.moe/user/api.php', { method: 'POST', body: form });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    const url = (await res.text()).trim();
-    if (!/^https?:\/\/(files\.)?catbox\.moe\//.test(url)) {
-      throw new Error(`unexpected catbox response: ${url.slice(0, 200)}`);
+// IG's Graph API needs a public HTTPS URL for the media. Free anonymous hosts
+// differ on datacenter IPs (catbox blocks GitHub runners → "412 Invalid uploader"),
+// so try several and use the first that works. Optionally set CATBOX_USERHASH
+// (free catbox account) to make catbox reliable.
+const UA = 'Mozilla/5.0 (mavrx-autopilot)';
+
+async function upCloudinary(buf, name, mime) {
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
+  const preset = process.env.CLOUDINARY_UPLOAD_PRESET;
+  if (!cloud || !preset) throw new Error('not configured (set CLOUDINARY_CLOUD_NAME + CLOUDINARY_UPLOAD_PRESET)');
+  const form = new FormData();
+  form.append('file', new Blob([buf], { type: mime }), name);
+  form.append('upload_preset', preset);
+  // `auto` handles both images and videos.
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/auto/upload`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  const j = await res.json();
+  if (!j.secure_url) throw new Error('no secure_url in response');
+  return j.secure_url;
+}
+async function upCatbox(buf, name, mime) {
+  const form = new FormData();
+  form.append('reqtype', 'fileupload');
+  if (process.env.CATBOX_USERHASH) form.append('userhash', process.env.CATBOX_USERHASH);
+  form.append('fileToUpload', new Blob([buf], { type: mime }), name);
+  const res = await fetch('https://catbox.moe/user/api.php', { method: 'POST', headers: { 'User-Agent': UA }, body: form });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 120)}`);
+  const url = (await res.text()).trim();
+  if (!/^https?:\/\/(files\.)?catbox\.moe\//.test(url)) throw new Error(`bad resp: ${url.slice(0, 120)}`);
+  return url;
+}
+async function upTmpfiles(buf, name, mime) {
+  const form = new FormData();
+  form.append('file', new Blob([buf], { type: mime }), name);
+  const res = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', headers: { 'User-Agent': UA }, body: form });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const j = await res.json();
+  const u = j && j.data && j.data.url;
+  if (!u) throw new Error('no url in response');
+  return u.replace('tmpfiles.org/', 'tmpfiles.org/dl/'); // direct-download form
+}
+
+async function uploadPublic(localPath) {
+  const ext = path.extname(localPath).slice(1).toLowerCase();
+  const mime = MIME_BY_EXT[ext] || 'application/octet-stream';
+  const buf = fs.readFileSync(localPath);
+  const name = path.basename(localPath);
+  const hosts = [['cloudinary', upCloudinary], ['catbox', upCatbox], ['tmpfiles', upTmpfiles]];
+  let lastErr;
+  for (const [label, fn] of hosts) {
+    try {
+      const url = await fn(buf, name, mime);
+      process.stderr.write(`[upload] via ${label}: ${url}\n`);
+      return url;
+    } catch (e) {
+      lastErr = e;
+      process.stderr.write(`[upload] ${label} failed: ${e.message}\n`);
     }
-    return url;
-  });
+  }
+  throw new Error(`all upload hosts failed → ${lastErr.message}`);
 }
 
 async function postIgPhoto(secrets, { imageUrl, caption, isStory }) {
@@ -185,15 +229,17 @@ async function publishFeed({ imagePath, caption, secrets }) {
   if (!fs.existsSync(imagePath)) throw new Error(`image not found: ${imagePath}`);
   if (!caption) throw new Error('caption is empty');
   const video = isVideo(imagePath);
-  const publicUrl = await uploadToCatbox(imagePath);
-  // allSettled (not all): if one platform fails we still record the other, so a
-  // partial success never triggers a repost-to-both on the next run.
-  const [igR, fbR] = await Promise.allSettled([
-    video ? postIgVideo(secrets, { videoUrl: publicUrl, caption, isStory: false })
-          : postIgPhoto(secrets, { imageUrl: publicUrl, caption, isStory: false }),
-    video ? postFbVideo(secrets, { videoPath: imagePath, caption })
-          : postFbPhoto(secrets, { imagePath, caption }),
-  ]);
+  // FB uploads the binary directly (no external host). IG needs a public URL, so
+  // ONLY the IG branch depends on uploadPublic — a host hiccup can't block FB.
+  // allSettled (not all): a partial success never triggers a repost-to-both next run.
+  const igTask = (async () => {
+    const publicUrl = await uploadPublic(imagePath);
+    return video ? postIgVideo(secrets, { videoUrl: publicUrl, caption, isStory: false })
+                 : postIgPhoto(secrets, { imageUrl: publicUrl, caption, isStory: false });
+  })();
+  const fbTask = video ? postFbVideo(secrets, { videoPath: imagePath, caption })
+                       : postFbPhoto(secrets, { imagePath, caption });
+  const [igR, fbR] = await Promise.allSettled([igTask, fbTask]);
   const ig_post_id = igR.status === 'fulfilled' ? igR.value : null;
   const fb_post_id = fbR.status === 'fulfilled' ? fbR.value : null;
   if (!ig_post_id && !fb_post_id) {
@@ -211,7 +257,7 @@ async function publishFeed({ imagePath, caption, secrets }) {
 async function publishStory({ imagePath, secrets }) {
   if (!fs.existsSync(imagePath)) throw new Error(`image not found: ${imagePath}`);
   const video = isVideo(imagePath);
-  const publicUrl = await uploadToCatbox(imagePath);
+  const publicUrl = await uploadPublic(imagePath);
   const ig_story_id = video
     ? await postIgVideo(secrets, { videoUrl: publicUrl, caption: null, isStory: true })
     : await postIgPhoto(secrets, { imageUrl: publicUrl, caption: null, isStory: true });
