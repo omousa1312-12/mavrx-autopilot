@@ -1,5 +1,9 @@
 {
-  "next_mode": "FEED",
+  "next_mode": "STORY",
+  "posted_assets": [
+    "reel-8.mp4"
+  ],
+  "last_feed_asset": "reel-8.mp4",
   "posted_drive_ids": [
     "1rmeFVcaFTf7zVFrFEiw1-Fn1KIoNptmh",
     "1I6Acb4UF9p9XxjE-SRf-iJdq2x9rQNxX",
@@ -15,8 +19,8 @@
   "last_feed_drive_title": "reel 8 (final amended).mp4",
   "last_run_date": "2026-06-17",
   "last_published_status": "live",
-  "last_ig_post_id": "17973847713060546",
-  "last_fb_post_id": "2147191765839804",
+  "last_ig_post_id": "17912057352220932",
+  "last_fb_post_id": "1419307853556498",
   "last_ig_story_id": "18121564036737954",
   "last_active_occasion": "summer_break",
   "cross_last_dispatch_date": "2026-06-16",
