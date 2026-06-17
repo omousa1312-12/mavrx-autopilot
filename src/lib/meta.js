@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const GRAPH = 'https://graph.facebook.com/v18.0';
 const BACKOFF_MS = [2000, 8000, 30000];
@@ -65,11 +66,25 @@ const UA = 'Mozilla/5.0 (mavrx-autopilot)';
 
 async function upCloudinary(buf, name, mime) {
   const cloud = process.env.CLOUDINARY_CLOUD_NAME;
-  const preset = process.env.CLOUDINARY_UPLOAD_PRESET;
-  if (!cloud || !preset) throw new Error('not configured (set CLOUDINARY_CLOUD_NAME + CLOUDINARY_UPLOAD_PRESET)');
+  if (!cloud) throw new Error('not configured (CLOUDINARY_CLOUD_NAME)');
   const form = new FormData();
   form.append('file', new Blob([buf], { type: mime }), name);
-  form.append('upload_preset', preset);
+  const preset = process.env.CLOUDINARY_UPLOAD_PRESET;
+  const key = process.env.CLOUDINARY_API_KEY;
+  const secret = process.env.CLOUDINARY_API_SECRET;
+  if (preset) {
+    form.append('upload_preset', preset); // unsigned preset
+  } else if (key && secret) {
+    // signed upload: signature = sha1("timestamp=<ts>" + api_secret). Secret is
+    // read from env (a GitHub Secret) and NEVER written to code or the repo.
+    const ts = Math.floor(Date.now() / 1000).toString();
+    const signature = crypto.createHash('sha1').update(`timestamp=${ts}${secret}`).digest('hex');
+    form.append('api_key', key);
+    form.append('timestamp', ts);
+    form.append('signature', signature);
+  } else {
+    throw new Error('cloudinary needs CLOUDINARY_UPLOAD_PRESET, or CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET');
+  }
   // `auto` handles both images and videos.
   const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/auto/upload`, { method: 'POST', body: form });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
