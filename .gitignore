@@ -1,0 +1,9 @@
+node_modules/
+tmp/
+*.local
+.env
+.env.*
+.DS_Store
+secrets/
+*.log
+# NOTE: state/ is intentionally committed (it is the source of truth across runs).

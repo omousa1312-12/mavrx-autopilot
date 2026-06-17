@@ -1,0 +1,49 @@
+{
+  "next_mode": "FEED",
+  "posted_drive_ids": [
+    "1rmeFVcaFTf7zVFrFEiw1-Fn1KIoNptmh",
+    "1I6Acb4UF9p9XxjE-SRf-iJdq2x9rQNxX",
+    "19Hf6eo3GwkXihha_pWCEsTQQCdFQoj67",
+    "1skEiLgDT0WWxTUtw4k63SFmxNwPGRDx0",
+    "1XUORXZIJQXBvY1k4lBInzMP6gmJLAIOZ",
+    "1tMQeUtZMtotZ9Ow6ey1bJIfbVmdvCsuu",
+    "1W437ymN4vWLP0D7Cfg9TEnkzNHGrNHKe",
+    "13rB2xb7f6FWFXtZ6BQi7FqDXekw0spMF",
+    "1CKi7mu2p3CXHdwFQBCjhfA-XMRmx9Q4k"
+  ],
+  "last_feed_drive_id": "1CKi7mu2p3CXHdwFQBCjhfA-XMRmx9Q4k",
+  "last_feed_drive_title": "reel 8 (final amended).mp4",
+  "last_run_date": "2026-06-17",
+  "last_published_status": "live",
+  "last_ig_post_id": "17973847713060546",
+  "last_fb_post_id": "2147191765839804",
+  "last_ig_story_id": "18121564036737954",
+  "last_active_occasion": "summer_break",
+  "cross_last_dispatch_date": "2026-06-16",
+  "cross_history": [
+    {
+      "date": "2026-06-16",
+      "asset": "reel 8 (final amended).mp4",
+      "bundle_count": 1,
+      "occasion": "summer_break"
+    },
+    {
+      "date": "2026-06-11",
+      "asset": "reel 11.mp4",
+      "bundle_count": 1,
+      "occasion": "summer_break"
+    },
+    {
+      "date": "2026-05-31",
+      "asset": "Reel mavrx.mov",
+      "bundle_count": 1,
+      "occasion": "evergreen"
+    },
+    {
+      "date": "2026-05-28",
+      "asset": "Mavrx-180.jpg",
+      "bundle_count": 4,
+      "occasion": "eid_aladha_1447"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "fixed_dates": [
+    {
+      "id": "saudi_national_day",
+      "match": "09-23",
+      "window_days": [-7, 3],
+      "theme": "patriotic_green",
+      "hook_angle": "Local pride — Made for Saudi kids, by a Saudi brand",
+      "color_overlay_hint": "green_white",
+      "must_have_hashtags": ["#اليوم_الوطني_السعودي", "#كلنا_السعودية", "#السعودية"],
+      "schedule_shift": null
+    },
+    {
+      "id": "saudi_founding_day",
+      "match": "02-22",
+      "window_days": [-5, 1],
+      "theme": "founding_heritage",
+      "hook_angle": "Three centuries of Saudi pride, dressed for the next generation",
+      "must_have_hashtags": ["#يوم_التأسيس", "#يوم_تأسيس_الدولة_السعودية"]
+    },
+    {
+      "id": "white_friday",
+      "match_range": "11-20..11-30",
+      "theme": "promotional_urgency",
+      "hook_angle": "وايت فرايداي — أقل أسعار السنة على أطقم مافركس",
+      "rules": ["mention discount % only if Omar has confirmed a live promo in chat"],
+      "must_have_hashtags": ["#وايت_فرايدي", "#WhiteFriday"]
+    },
+    {
+      "id": "back_to_school",
+      "match_range": "08-15..09-15",
+      "theme": "school_ready",
+      "hook_angle": "جاهزين للسنة الدراسية الجديدة — اطقم مريحة وأنيقة",
+      "must_have_hashtags": ["#العودة_للمدارس", "#مدارس_2026"]
+    }
+  ],
+  "lunar_dates": [
+    {
+      "id": "ramadan_1447",
+      "start": "2026-02-17",
+      "end": "2026-03-19",
+      "theme": "ramadan_family",
+      "hook_angle": "اطقم تجمع العائلة في رمضان",
+      "rules": [
+        "shift feed-post schedule from 20:00 to 21:00 Asia/Riyadh (post-Maghrib + iftar window)",
+        "shift story-reshare from 10:30 to 14:00 (afternoon scroll, pre-iftar prep)",
+        "modest framing; family/iftar/gathering angles preferred",
+        "no urgency/scarcity language"
+      ],
+      "must_have_hashtags": ["#رمضان_كريم", "#رمضان_2026", "#رمضان_في_السعودية"]
+    },
+    {
+      "id": "eid_alfitr_1447",
+      "start": "2026-03-20",
+      "end": "2026-03-22",
+      "theme": "eid_gifting",
+      "hook_angle": "اطقم العيد جاهزة — اطفالك بأناقة في صباح العيد",
+      "must_have_hashtags": ["#عيد_الفطر", "#كل_عام_وانتم_بخير", "#عيدية", "#ملابس_العيد"]
+    },
+    {
+      "id": "eid_aladha_1447",
+      "start": "2026-05-27",
+      "end": "2026-05-28",
+      "theme": "eid_gifting",
+      "hook_angle": "عيد أضحى مبارك — اطقم تجمع الأطفال بإطلالة موحدة",
+      "rules": ["window covers Eid eve + 1st day only; post-Eid switch to evergreen / summer_break"],
+      "must_have_hashtags": ["#عيد_الاضحى", "#عيد_مبارك", "#حج_2026"]
+    },
+    {
+      "id": "ramadan_1448",
+      "start": "2027-02-07",
+      "end": "2027-03-08",
+      "theme": "ramadan_family",
+      "hook_angle": "اطقم تجمع العائلة في رمضان",
+      "rules": ["same as ramadan_1447"],
+      "must_have_hashtags": ["#رمضان_كريم", "#رمضان_2027"]
+    }
+  ],
+  "seasonal": [
+    {
+      "id": "summer_break",
+      "match_range": "06-01..08-31",
+      "theme": "summer_travel",
+      "hook_angle": "اطقم خفيفة لرحلات الصيف",
+      "must_have_hashtags": ["#صيف_2026", "#رحلات_العائلة"]
+    },
+    {
+      "id": "winter_layering",
+      "match_range": "11-01..01-31",
+      "theme": "winter_warm",
+      "hook_angle": "اطقم بأكمام طويلة من قطن مصري — دفء بدون ثقل",
+      "must_have_hashtags": ["#شتاء_2026", "#ملابس_شتوية"]
+    }
+  ],
+  "priority": ["lunar_dates", "fixed_dates", "seasonal"]
+}

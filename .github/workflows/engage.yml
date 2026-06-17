@@ -1,0 +1,46 @@
+name: mavrx-engage
+
+# Smart AI replies to IG + FB comments & DMs, every 2 hours.
+# ~12 runs/day × ~1–2 min ≈ well within the free private-repo minutes.
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit engagement.json back
+
+concurrency:
+  group: mavrx-autopilot-state
+  cancel-in-progress: false
+
+jobs:
+  engage:
+    runs-on: ubuntu-latest
+    env:
+      META_SECRETS_JSON: ${{ secrets.META_SECRETS_JSON }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      MAVRX_STATE_DIR: ${{ github.workspace }}/state
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Comments poll
+        run: node src/engage.js comments-poll
+      - name: DMs poll
+        run: node src/engage.js dms-poll
+
+      - name: Commit state
+        if: always()
+        run: |
+          git config user.name "mavrx-autopilot[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/
+          if git diff --cached --quiet; then echo "no state change"; exit 0; fi
+          git commit -m "state: engage $(date -u +%FT%TZ)"
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+          git push

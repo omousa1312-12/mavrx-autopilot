@@ -1,0 +1,14 @@
+{
+  "name": "mavrx-autopilot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless autonomous social manager for Mavrx KSA — daily IG+FB posting + AI comment/DM engagement, runs on GitHub Actions with no computer open.",
+  "type": "commonjs",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "post": "node src/post.js",
+    "engage:comments": "node src/engage.js comments-poll",
+    "engage:dms": "node src/engage.js dms-poll",
+    "secret-scan": "bash scripts/secret-scan.sh"
+  }
+}
