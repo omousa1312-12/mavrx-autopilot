@@ -1,12 +1,13 @@
 {
-  "next_mode": "FEED",
+  "next_mode": "STORY",
   "posted_assets": [
     "reel-8.mp4",
     "015A2970-Enhanced-NR.jpg",
     "015A3252-Enhanced-NR.jpg",
-    "015A3416-Enhanced-NR-1.jpg"
+    "015A3416-Enhanced-NR-1.jpg",
+    "015A3920-Enhanced-NR.jpg"
   ],
-  "last_feed_asset": "015A3416-Enhanced-NR-1.jpg",
+  "last_feed_asset": "015A3920-Enhanced-NR.jpg",
   "posted_drive_ids": [
     "1rmeFVcaFTf7zVFrFEiw1-Fn1KIoNptmh",
     "1I6Acb4UF9p9XxjE-SRf-iJdq2x9rQNxX",
@@ -20,10 +21,10 @@
   ],
   "last_feed_drive_id": "1CKi7mu2p3CXHdwFQBCjhfA-XMRmx9Q4k",
   "last_feed_drive_title": "reel 8 (final amended).mp4",
-  "last_run_date": "2026-06-24",
+  "last_run_date": "2026-06-25",
   "last_published_status": "live",
-  "last_ig_post_id": "17943390306240152",
-  "last_fb_post_id": "1115590134969947_122110555941310006",
+  "last_ig_post_id": "18057059906742639",
+  "last_fb_post_id": "1115590134969947_122110952697310006",
   "last_ig_story_id": "18100115249266954",
   "last_active_occasion": "summer_break",
   "cross_last_dispatch_date": "2026-06-16",
