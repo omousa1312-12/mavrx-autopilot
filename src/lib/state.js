@@ -31,13 +31,17 @@ const DEFAULT_STATE = {
   last_active_occasion: null,
   cross_last_dispatch_date: null,
   cross_history: [],
+  post_products: {},         // { ig/fb post id: {sku_prefix, handle, title, price, matched} } — written at publish
 };
 
 const DEFAULT_ENGAGEMENT = {
   last_comment_ids: { ig: [], fb: [] },
   last_dm_first_touch: { ig: [], fb: [] },
   last_dm_message_ids: { ig: {}, fb: {} },
-  stats: { comments_replied: 0, comments_liked: 0, comments_hidden: 0, dms_replied: 0, dms_escalated: 0, errors: 0 },
+  recent_replies: [],        // rolling window of the last ~20 sent replies (for anti-repetition)
+  last_auth_alert_date: null, // dedupes the "token dead" Telegram alert to once/day
+  private_replied: { ig: [], fb: [] }, // comment ids already privately DM'd (Meta allows exactly one per comment)
+  stats: { comments_replied: 0, comments_liked: 0, comments_hidden: 0, dms_replied: 0, dms_escalated: 0, comments_escalated: 0, dms_from_comments: 0, errors: 0 },
 };
 
 function loadState() {
@@ -50,6 +54,9 @@ function loadEngagement() {
   s.last_comment_ids = { ig: [], fb: [], ...(s.last_comment_ids || {}) };
   s.last_dm_first_touch = { ig: [], fb: [], ...(s.last_dm_first_touch || {}) };
   s.last_dm_message_ids = { ig: {}, fb: {}, ...(s.last_dm_message_ids || {}) };
+  s.recent_replies = Array.isArray(s.recent_replies) ? s.recent_replies : [];
+  if (typeof s.last_auth_alert_date === 'undefined') s.last_auth_alert_date = null;
+  s.private_replied = { ig: [], fb: [], ...(s.private_replied || {}) };
   s.stats = { ...DEFAULT_ENGAGEMENT.stats, ...(s.stats || {}) };
   return s;
 }

@@ -1,37 +1,39 @@
-name: mavrx-engage
+name: mavrx-comments
 
-# DM poll + deep comments backstop, every 2 hours. The near-instant comment
-# replies run in comments.yml (*/5); this run catches DMs and anything the fast
-# poll deferred or missed (it sweeps a wider set of posts).
+# Near-instant brand agent: AI replies to IG + FB comments AND DMs, every 5 min
+# (fast-poll = both in one process, one AI budget). Catalog-aware: prices, live
+# stock, product links from mavrxksa.com. GitHub cron is best-effort (~5–15 min
+# real cadence). Free on a PUBLIC repo (unlimited Actions minutes).
 on:
   schedule:
-    - cron: '0 */2 * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: write   # commit engagement.json back
 
 concurrency:
-  group: mavrx-autopilot-state
+  group: mavrx-autopilot-state   # shared with post.yml + engage.yml → runs queue, never overlap mid-reply
   cancel-in-progress: false
 
 jobs:
-  engage:
+  comments:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     env:
       META_SECRETS_JSON: ${{ secrets.META_SECRETS_JSON }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       MAVRX_STATE_DIR: ${{ github.workspace }}/state
+      MAVRX_AI_REPLY_BUDGET: '20'   # shared across comments + DMs in one process; overflow defers
+      MAVRX_MEDIA_LIMIT: '10'       # fast poll only needs recent posts; the 2h engage run sweeps 25
+      MAVRX_TG_QUIET: '1'           # Telegram only on escalations/errors — no digest spam at ~288 runs/day
     steps:
       - uses: actions/checkout@v4
       # no setup-node: ubuntu-latest ships Node >= 20; repo has zero npm deps
-
-      - name: Comments poll (backstop)
-        run: node src/engage.js comments-poll
-      - name: DMs poll
-        run: node src/engage.js dms-poll
+      - name: Fast poll (comments + DMs)
+        run: node src/engage.js fast-poll
 
       - name: Commit state
         if: always()
@@ -40,9 +42,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state/
           if git diff --cached --quiet; then echo "no state change"; exit 0; fi
-          git commit -m "state: engage $(date -u +%FT%TZ)"
+          git commit -m "state: comments $(date -u +%FT%TZ)"
           for i in 1 2 3; do
             git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push && exit 0
             echo "push attempt $i failed; retrying"; sleep $((i * 5))
           done
-          echo "::error::state push failed after 3 attempts"; exit 1
+          echo "::error::state push failed after 3 attempts — next run may double-reply"; exit 1

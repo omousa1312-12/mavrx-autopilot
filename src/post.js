@@ -24,7 +24,8 @@ const { loadState, saveState, loadCalendar } = require('./lib/state');
 const { resolveOccasion } = require('./lib/occasion');
 const assets = require('./lib/assets');
 const meta = require('./lib/meta');
-const { generateCaption } = require('./lib/caption');
+const { generateCaption, anthropic, hasKey, MODEL } = require('./lib/caption');
+const catalogLib = require('./lib/catalog');
 const notify = require('./lib/notify');
 const { maybeCrossDispatch } = require('./lib/crossbundle');
 
@@ -36,6 +37,34 @@ function rankScore(f) {
   if (f.isVideo && f.size > 5 * 1024 * 1024) return 3;
   if (!f.isVideo && f.size > 800 * 1024) return 2;
   return 1;
+}
+
+// Identify which catalog product this post shows, so the engagement agent can
+// answer "how much is this?" with the exact price/link. SKU-in-filename first
+// (e.g. 02mv25202-...), else one cheap Claude match on filename+caption. All
+// fail-soft — an unmapped post just falls back to caption+catalog matching.
+async function matchPostProduct(assetName, caption) {
+  try {
+    const catalog = await catalogLib.fetchCatalog();
+    if (!catalog) return null;
+    const m = assetName.match(/\d{2}mv\d{5}/i);
+    if (m) {
+      const p = catalogLib.findBySkuPrefix(catalog, m[0].toLowerCase());
+      if (p) return { sku_prefix: p.skuPrefix, handle: p.handle, title: p.title, price: p.priceMin, matched: 'sku' };
+    }
+    if (!hasKey()) return null;
+    const list = catalog.map((p) => `${p.handle} | ${p.title}`).join('\n');
+    const out = (await anthropic(
+      'You match a social post to a store product. Output ONLY the product handle from the list, or NONE. No commentary.',
+      `Post asset filename: ${assetName}\nPost caption:\n"""${(caption || '').slice(0, 500)}"""\n\nProducts (handle | title):\n${list}\n\nWhich product does this post show? Output the handle or NONE:`,
+      50, MODEL,
+    )).trim().toLowerCase();
+    if (out && out !== 'none') {
+      const p = catalogLib.findByHandle(catalog, out);
+      if (p) return { sku_prefix: p.skuPrefix, handle: p.handle, title: p.title, price: p.priceMin, matched: 'claude' };
+    }
+  } catch (e) { log(`post-product match failed (${e.message}) — post stays unmapped`); }
+  return null;
 }
 
 async function runFeed(state, calendar, occasion) {
@@ -77,6 +106,16 @@ async function runFeed(state, calendar, occasion) {
   state.last_ig_post_id = res.ig_post_id;
   state.last_fb_post_id = res.fb_post_id;
   state.last_active_occasion = occasion?.id || null;
+
+  // Map this post to the product it shows (for the engagement agent). Fail-soft.
+  const productEntry = await matchPostProduct(chosen.name, caption);
+  if (productEntry) {
+    state.post_products = state.post_products || {};
+    if (res.ig_post_id) state.post_products[res.ig_post_id] = productEntry;
+    if (res.fb_post_id) state.post_products[res.fb_post_id] = productEntry;
+    log(`post-product map: ${productEntry.handle} (${productEntry.matched})`);
+  }
+
   saveState(state); // record the publish durably BEFORE cross-dispatch / notify
 
   const cross = await maybeCrossDispatch(state, calendar, chosen.path, chosen.name);

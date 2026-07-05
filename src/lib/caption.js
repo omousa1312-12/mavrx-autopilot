@@ -22,14 +22,25 @@ const SHOPIFY_URL = 'https://mavrxksa.com';
 
 function hasKey() { return !!KEY; }
 
-function anthropic(system, user, maxTokens, model) {
+// Models from Sonnet 5 / Opus 4.7+ reject temperature/top_p (400). Only send a
+// temperature to models that still accept it (the Sonnet/Opus 4.6 family, Haiku).
+function modelAcceptsTemperature(model) {
+  return !/sonnet-5|opus-4-(7|8|9)|opus-4-\d\d|fable|mythos/i.test(model);
+}
+
+function anthropic(system, user, maxTokens, model, opts = {}) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({
-      model: model || MODEL,
+    const m = model || MODEL;
+    const payload = {
+      model: m,
       max_tokens: maxTokens || 1000,
       system,
       messages: [{ role: 'user', content: user }],
-    });
+    };
+    if (typeof opts.temperature === 'number' && modelAcceptsTemperature(m)) {
+      payload.temperature = opts.temperature;
+    }
+    const body = JSON.stringify(payload);
     const req = https.request({
       hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
       headers: {
@@ -137,31 +148,111 @@ Return ONLY the 5-block caption. Nothing before. Nothing after. No commentary, n
 }
 
 // ── Smart engagement reply (comments + DMs) ──
-// Returns one of: {reply}, {escalate:true}, {skip:true}, {error}, or null (no key).
-async function generateReply({ text, surface, platform }) {
+// Returns: {reply}, {dmLead:true, reply}, {escalate:true}, {skip:true}, {error}, or null (no key).
+// ctx: username, postCaption, recentReplies (anti-repetition), and — when the
+// catalog is available — productContext (the exact product this post shows) or
+// catalogBlock (the whole store, so the model can identify it from the caption).
+async function generateReply({ text, surface, platform, username, postCaption, recentReplies, productContext, catalogBlock }) {
   if (!KEY) return null;
-  const system = `You are Mavrxwear (مافركس), a premium kids-apparel brand from Saudi Arabia. You answer ${surface}s on ${platform} in the brand's voice: a warm Saudi/Gulf mother talking to another mother. Khaleeji-flavoured Arabic, never corporate, never formal MSA. Reply in the SAME language the customer used (Arabic → Arabic, English → short casual English).
+  const who = username ? `@${username}` : 'a customer';
+  const caption = (postCaption || '').trim().slice(0, 300);
+  const recent = (recentReplies || []).filter(Boolean).slice(-20);
+  const hasCatalog = !!(productContext || catalogBlock);
 
+  const contextBlock = surface === 'comment'
+    ? `CONTEXT
+- This is a public comment on ${platform}. The post they commented on says: """${caption || '(no caption)'}"""
+- Commenter: ${who}
+React to what THEY specifically said, and to the post when it's relevant. Sound like a real person who read their comment — never canned.`
+    : `CONTEXT
+- This is a direct message on ${platform} from ${who}. React to what they actually asked.`;
+
+  const productBlock = productContext
+    ? `\nPRODUCT — this post shows: ${productContext}\n`
+    : (catalogBlock
+      ? `\nCATALOG — the store's products (identify which one the post shows from the caption, if you can):\n${catalogBlock}\n`
+      : '');
+
+  const varietyBlock = recent.length
+    ? `\nVARIETY — here are your most recent replies. Do NOT reuse their openers, phrasing, sentence shapes, or emoji patterns. Sound like a different breath each time:\n${recent.map((r, i) => `${i + 1}. ${r}`).join('\n')}\n`
+    : '';
+
+  // The comment→DM play is only offered when we actually have catalog data to
+  // put in the DM — otherwise the model can't route to it and we answer publicly.
+  const dmLeadRule = (surface === 'comment' && hasCatalog)
+    ? `- If the comment asks the PRICE, how to ORDER, AVAILABILITY, or SIZES → output exactly "DMLEAD: " followed by a short public reply telling them to check their DMs (warm, VARIED — e.g. رسلنا لك التفاصيل خاص 🤍 / شيكي على الخاص حبيبتي ✨ / تفاصيل السعر وصلتك بالخاص — never reuse phrasing from VARIETY). Do NOT put any price in the public reply.\n`
+    : '';
+
+  const system = `You are Mavrxwear (مافركس), a premium kids-apparel brand from Saudi Arabia. You answer ${surface}s on ${platform} as a warm Saudi/Gulf mother talking to another mother — Khaleeji-flavoured Arabic, never corporate, never formal MSA. Reply in the SAME language the customer used (Arabic → Arabic, English → short casual English; default Arabic).
+
+${contextBlock}
+${productBlock}${varietyBlock}
 BRAND FACTS you may state:
 - 100% Egyptian cotton, coordinated matching sets for kids.
 - Ships across KSA + GCC in about 2–5 business days.
 - Payment: cash on delivery, plus mada / Visa / Apple Pay.
-- Prices and all sizes/colors are on each product page — point them to the store: ${SHOPIFY_URL}
+- Prices and all sizes/colors live on each product page — point them to the store: ${SHOPIFY_URL}
 
 HARD RULES:
-- Keep it to 1–2 short warm lines. Add the store link only when it actually helps (price/size/where-to-buy/availability).
+${dmLeadRule}- 1–2 short warm sentences, max ~40 words. Vary your openers and emoji (0–2 emoji, never the same combo two replies in a row). No hashtags.
+- Add the store link ONLY when the comment asks where-to-buy and you are NOT using DMLEAD.
 - NEVER invent a price, a discount, a delivery date for a specific order, stock counts, or order status.
-- If the message is praise/an emoji with nothing to answer → output EXACTLY: SKIP
-- If the message needs a human — a personal order ("where is my order", tracking), a complaint, refund/return, a damaged or wrong item, a payment dispute, or anything you cannot answer safely and truthfully → output EXACTLY: ESCALATE
+- Praise or an emoji with nothing to answer → still reply with a short, VARIED thank-you (a real brand rep thanks people). Do NOT skip praise.
+- Output EXACTLY "SKIP" only for empty, unintelligible, or bare friend-tag comments (someone @-tagging a friend with nothing to answer).
+- If it needs a human — a personal order ("where is my order", tracking), a complaint, refund/return, a damaged or wrong item, a payment dispute, or anything you cannot answer safely and truthfully → output EXACTLY: ESCALATE
 - Otherwise → output ONLY the reply text (no quotes, no labels, no commentary).`;
-  const user = `Customer ${surface} on ${platform}:\n"""${(text || '').slice(0, 800)}"""\n\nYour single reply (or SKIP / ESCALATE):`;
+  const user = `Customer ${surface} on ${platform}:\n"""${(text || '').slice(0, 800)}"""\n\nYour single reply (or SKIP / ESCALATE${dmLeadRule ? ' / DMLEAD: <public reply>' : ''}):`;
   let out;
-  try { out = (await anthropic(system, user, 280, MODEL)).trim(); }
+  try { out = (await anthropic(system, user, 280, MODEL, { temperature: 0.9 })).trim(); }
   catch (e) { return { error: e.message }; }
   if (/^ESCALATE\b/i.test(out)) return { escalate: true };
   if (/^SKIP\b/i.test(out)) return { skip: true };
   if (!out) return { skip: true };
+  if (/^DMLEAD:/i.test(out)) {
+    const pub = out.replace(/^DMLEAD:\s*/i, '').trim();
+    if (pub) return { dmLead: true, reply: pub.length > 950 ? pub.slice(0, 950).replace(/\s+\S*$/, '') : pub };
+    return { skip: true };
+  }
+  if (out.length > 950) out = out.slice(0, 950).replace(/\s+\S*$/, ''); // keep well under IG's limit, on a word boundary
   return { reply: out };
 }
 
-module.exports = { hasKey, anthropic, generateCaption, generateReply, MODEL };
+// ── DM brain — multi-turn, catalog-grounded ──
+// messages: chronological [{fromUs:bool, text}] (last ~10). Returns the same
+// shapes as generateReply (minus dmLead).
+async function generateDmReply({ messages, catalogBlock, platform }) {
+  if (!KEY) return null;
+  const transcript = (messages || [])
+    .map((m) => `${m.fromUs ? 'US (Mavrx)' : 'CUSTOMER'}: ${(m.text || '').slice(0, 300)}`)
+    .join('\n');
+
+  const system = `You are Mavrxwear (مافركس), a premium kids-apparel brand from Saudi Arabia, handling the brand's ${platform} direct messages as a warm Saudi/Gulf mother talking to another mother — Khaleeji-flavoured Arabic, never corporate, never formal MSA. Reply in the customer's language (Arabic default).
+
+${catalogBlock ? `CATALOG — the store's live products. Prices, sizes, and links MUST come ONLY from this list:\n${catalogBlock}\n` : `You have no catalog data right now — do not state any price or size; point them to the store: ${SHOPIFY_URL}\n`}
+BRAND FACTS:
+- 100% Egyptian cotton, coordinated matching sets for kids.
+- Ships across KSA + GCC in about 2–5 business days.
+- Payment: cash on delivery, plus mada / Visa / Apple Pay.
+- Store: ${SHOPIFY_URL}
+
+HARD RULES:
+- This is an ongoing conversation — read the transcript and continue it naturally. Do NOT re-welcome or re-introduce the brand if you already spoke.
+- 1–4 short warm sentences. Answer the actual question. Include a direct product link when it helps them buy.
+- Prices, sizes, availability ONLY from the CATALOG section. If a product isn't in it, say you'll check and share the store link — never guess.
+- The sizes listed are each product's size RANGE — live stock changes. If they ask whether a SPECIFIC size is in stock right now, do NOT confirm it yourself; share the product link and say current availability shows on the page.
+- NEVER invent a discount, a delivery date for a specific order, or order status.
+- If it needs a human — order status/tracking ("وين طلبي"), complaint, refund/return, damaged or wrong item, payment dispute, or anything you cannot answer truthfully from the catalog and brand facts → output EXACTLY: ESCALATE
+- If there is nothing to answer (e.g. just an emoji reaction) → output EXACTLY: SKIP
+- Otherwise output ONLY the reply text (no quotes, labels, or commentary).`;
+  const user = `CONVERSATION so far (oldest first):\n${transcript}\n\nYour single reply to the customer's last message (or SKIP / ESCALATE):`;
+  let out;
+  try { out = (await anthropic(system, user, 400, MODEL, { temperature: 0.9 })).trim(); }
+  catch (e) { return { error: e.message }; }
+  if (/^ESCALATE\b/i.test(out)) return { escalate: true };
+  if (/^SKIP\b/i.test(out)) return { skip: true };
+  if (!out) return { skip: true };
+  if (out.length > 950) out = out.slice(0, 950).replace(/\s+\S*$/, '');
+  return { reply: out };
+}
+
+module.exports = { hasKey, anthropic, generateCaption, generateReply, generateDmReply, MODEL };
