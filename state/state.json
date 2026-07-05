@@ -1,5 +1,5 @@
 {
-  "next_mode": "FEED",
+  "next_mode": "STORY",
   "posted_assets": [
     "reel-8.mp4",
     "015A2970-Enhanced-NR.jpg",
@@ -9,9 +9,10 @@
     "015A4075-Enhanced-NR-1.jpg",
     "215.jpg",
     "DJ1A3183.jpg",
-    "DSC03229.jpg"
+    "DSC03229.jpg",
+    "DSC03250.jpg"
   ],
-  "last_feed_asset": "DSC03229.jpg",
+  "last_feed_asset": "DSC03250.jpg",
   "posted_drive_ids": [
     "1rmeFVcaFTf7zVFrFEiw1-Fn1KIoNptmh",
     "1I6Acb4UF9p9XxjE-SRf-iJdq2x9rQNxX",
@@ -25,10 +26,10 @@
   ],
   "last_feed_drive_id": "1CKi7mu2p3CXHdwFQBCjhfA-XMRmx9Q4k",
   "last_feed_drive_title": "reel 8 (final amended).mp4",
-  "last_run_date": "2026-07-04",
+  "last_run_date": "2026-07-05",
   "last_published_status": "live",
-  "last_ig_post_id": "17957502567158172",
-  "last_fb_post_id": "1115590134969947_122112416985310006",
+  "last_ig_post_id": "18101674757128349",
+  "last_fb_post_id": "1115590134969947_122112803433310006",
   "last_ig_story_id": "18381025051165826",
   "last_active_occasion": "summer_break",
   "cross_last_dispatch_date": "2026-06-16",
@@ -57,5 +58,6 @@
       "bundle_count": 4,
       "occasion": "eid_aladha_1447"
     }
-  ]
+  ],
+  "post_products": {}
 }
