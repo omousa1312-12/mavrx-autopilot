@@ -13,7 +13,8 @@
       "17883706929346956",
       "18494085727070778",
       "18082212494222500",
-      "17997866714873227"
+      "17997866714873227",
+      "18043956722796430"
     ],
     "fb": []
   },
@@ -35,6 +36,11 @@
       "t": 1783270633223,
       "platform": "instagram",
       "text": "Easy! 🛍️ Head over to mavrxksa.com, pick your favourites and checkout — we accept mada, Visa, Apple Pay, or cash on delivery. Ships all across KSA & GCC!"
+    },
+    {
+      "t": 1783638159089,
+      "platform": "instagram",
+      "text": "والله يضوي ��لصيف بأطفالك 🔥 نورتينا!"
     }
   ],
   "last_auth_alert_date": null,
@@ -43,7 +49,7 @@
     "fb": []
   },
   "stats": {
-    "comments_replied": 10,
+    "comments_replied": 11,
     "comments_liked": 0,
     "comments_hidden": 0,
     "dms_replied": 0,
