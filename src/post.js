@@ -81,8 +81,22 @@ async function runFeed(state, calendar, occasion) {
   const chosen = fresh[0];
   log(`FEED pick: ${chosen.name} (${chosen.isVideo ? 'video' : 'image'}, ${(chosen.size / 1024).toFixed(0)} KB)`);
 
+  // Pre-caption product match (SKU-in-filename only — cheap, no AI): lets the
+  // caption talk about the actual garment instead of generic clothes.
+  let preProduct = null;
+  try {
+    const m = chosen.name.match(/\d{2}mv\d{5}/i);
+    if (m) {
+      const catalog = await catalogLib.fetchCatalog();
+      const p = catalog && catalogLib.findBySkuPrefix(catalog, m[0].toLowerCase());
+      if (p) { preProduct = { title: p.title }; log(`pre-caption product: ${p.title}`); }
+    }
+  } catch (e) { log(`pre-caption product match skipped (${e.message})`); }
+
   const caption = await generateCaption({
     title: chosen.name, type: chosen.isVideo ? 'video' : 'image', occasion,
+    recentCaptions: state.recent_captions || [],
+    product: preProduct,
   });
   if (!caption) throw new Error('caption generation returned empty');
   log(`caption (${caption.length} chars): ${caption.slice(0, 80).replace(/\n/g, ' ')}…`);
@@ -106,6 +120,8 @@ async function runFeed(state, calendar, occasion) {
   state.last_ig_post_id = res.ig_post_id;
   state.last_fb_post_id = res.fb_post_id;
   state.last_active_occasion = occasion?.id || null;
+  // Caption memory — feeds the anti-repetition block of future captions.
+  state.recent_captions = [...(state.recent_captions || []), caption].slice(-12);
 
   // Map this post to the product it shows (for the engagement agent). Fail-soft.
   const productEntry = await matchPostProduct(chosen.name, caption);
