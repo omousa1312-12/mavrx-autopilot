@@ -67,15 +67,51 @@ function anthropic(system, user, maxTokens, model, opts = {}) {
   });
 }
 
-// ── Daily caption — verbatim mavrx-content-design TIDD-EC prompt ──
-async function generateCaption({ title, type, occasion }) {
+// ── Daily caption — mavrx-content-design TIDD-EC prompt + anti-repetition ──
+// Evergreen-day creative angles, rotated by day-of-year so consecutive posts
+// never open from the same emotional door. Occasion days use the occasion's
+// own hook_angle instead.
+const EVERGREEN_ANGLES = [
+  'the morning-routine chaos of dressing kids, solved by a ready matching set',
+  'the family photo where everyone finally looks coordinated',
+  'how soft real Egyptian cotton feels on a child’s skin at bedtime',
+  'siblings matching — the older one "leading" the little one',
+  'a weekend outing / family gathering (لمّة) look',
+  'a gift a mother sends to her sister’s kids',
+  'clothes that survive washing after washing without fading',
+  'the moment guests arrive and the kids happen to look put-together',
+  'packing outfits for a family trip — one set, zero thinking',
+  'a mother’s quiet pride watching her kids walk ahead of her',
+  'school-morning speed: dressed in one minute, no arguments',
+  'the "وين اشتريتيه؟" question from other mothers',
+];
+const LINE2_ROTATION = ['b', 'a', 'b', 'c', 'b', 'a', 'b']; // (b) questions ≥3/7 — questions drive comments
+
+function dayOfYear(d) {
+  const t = d || new Date();
+  return Math.floor((t - new Date(t.getFullYear(), 0, 0)) / 86400000);
+}
+
+async function generateCaption({ title, type, occasion, recentCaptions, product }) {
   if (!KEY) throw new Error('ANTHROPIC_API_KEY not set');
   const occId = occasion?.id || 'none';
   const theme = occasion?.theme || 'evergreen';
-  const hook = occasion?.hook_angle || 'family + quality';
+  const doy = dayOfYear();
+  const angle = occasion?.hook_angle || EVERGREEN_ANGLES[doy % EVERGREEN_ANGLES.length];
+  const line2 = LINE2_ROTATION[doy % LINE2_ROTATION.length];
   const rules = (occasion?.rules && occasion.rules.length) ? occasion.rules.join('; ') : 'none';
   const tags = (occasion?.must_have_hashtags && occasion.must_have_hashtags.length)
     ? occasion.must_have_hashtags.join(' ') : 'none';
+
+  // Anti-repetition: the model sees its own recent captions and must not echo them.
+  const recent = (recentCaptions || []).filter(Boolean).slice(-8);
+  const varietyBlock = recent.length
+    ? `\nYOUR RECENT CAPTIONS — the reader sees these back to back with today's. Do NOT reuse their opening words, hooks, sentence shapes, English lines, or hashtag combinations. Today's caption must feel like a different day, not a remix:\n${recent.map((c, i) => `--- caption ${i + 1} ---\n${String(c).slice(0, 260)}`).join('\n')}\n`
+    : '';
+
+  const productBlock = product?.title
+    ? `- Product in this post: ${product.title} (write about THIS garment — its colors/type — not generic clothes)\n`
+    : '';
 
   const system = "You are Mavrxwear's lead Arabic copywriter. Return ONLY the final 5-block caption text — no preamble, no markdown fences, no labels, no commentary.";
   const user = `You are Mavrxwear's lead Arabic copywriter. Write today's Instagram + Facebook caption.
@@ -88,26 +124,26 @@ Your voice: warm best friend speaking mother-to-mother, NOT a brand speaking to 
 TODAY'S INPUTS
 - Asset title: ${title}
 - Asset type: ${type}
-- SKU (if title contains pattern like 14mv25107): treat as the product
+${productBlock}- SKU (if title contains pattern like 14mv25107): treat as the product
 - Active occasion: ${occId}
 - Theme: ${theme}
-- Hook angle (paraphrase, do not copy verbatim): ${hook}
+- TODAY'S CREATIVE ANGLE (build LINE 1 around this specific moment — paraphrase it, don't copy): ${angle}
 - Occasion rules (obey strictly): ${rules}
 - Required occasion hashtags: ${tags}
-
+${varietyBlock}
 OUTPUT FORMAT — exactly 5 blocks, in this order, nothing else around:
 
   LINE 1 — Arabic hook, 6–12 words
     • If active occasion → open with the occasion
-    • Else → open with a motherhood moment
+    • Else → open with TODAY'S CREATIVE ANGLE above (that exact moment, in your words)
     • Must contain ≥1 motherhood-coded word: أطفالك / طفلتك / لمّيهم / صباح / إطلالة / يوم / صورة / عيلة
     • Sounds like a friend texting, NOT a brand announcing
 
-  LINE 2 — Arabic supporting line, 8–16 words. Pick ONE pattern:
+  LINE 2 — Arabic supporting line, 8–16 words. TODAY'S PATTERN IS (${line2}) — use it:
     (a) Feature → benefit: 'قطن مصري ١٠٠٪ يلامس بشرة طفلك بأمان'
     (b) Question to invite a comment: 'أي لون يجنّن أطفالك أكثر؟ قوليلنا'
-    (c) Light scarcity if occasion supports it: 'خلّيها وصلتك قبل صباح العيد'
-    Engagement quota: option (b) MUST be used often — questions drive comments.
+    (c) Light scarcity (if it fits the day; otherwise fall back to (a)): 'خلّيها وصلتك قبل صباح العيد'
+    Write a FRESH sentence in that pattern — never the example text, never a line from YOUR RECENT CAPTIONS.
 
   (blank line)
 
@@ -126,6 +162,7 @@ OUTPUT FORMAT — exactly 5 blocks, in this order, nothing else around:
     • Audience (≥2): pick from  #امهات_السعودية  #امهات_الخليج  #أمهات_جدة  #أمهات_الرياض  #ام_سعودية  #امهات_خليجية
     • Product (≥1): pick from  #ملابس_اطفال  #ملابس_اطفال_قطن  #قطن_مصري  #اطقم_اطفال  #ازياء_اطفال  #ملابس_مافركس
     • Discovery (1): pick from  #kidsfashion  #toddlerstyle  #gulfmoms  #ksamoms
+    • VARY the geo/audience/product picks vs YOUR RECENT CAPTIONS — never ship the same hashtag set twice in a row
 
 DO
 - Use Khaleeji-flavoured Arabic where natural: حلوة, لمّيهم, شوفي, قوليلنا, يجنّن
@@ -143,7 +180,7 @@ DON'T
 
 Return ONLY the 5-block caption. Nothing before. Nothing after. No commentary, no markdown fences, no labels.`;
 
-  const txt = await anthropic(system, user, 700, MODEL);
+  const txt = await anthropic(system, user, 700, MODEL, { temperature: 0.9 });
   return (txt || '').trim();
 }
 
